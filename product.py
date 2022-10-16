@@ -1,7 +1,7 @@
 from itertools import product
 from typing import Union
 
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, HTTPException
 from pydantic import BaseModel
 from fastapi.responses import HTMLResponse
 
@@ -19,6 +19,10 @@ mock_database = [{'name' : "banana", 'price_unit': 1.50, 'qtd' : 4 , 'is_availab
                  {'name' : "manga", 'price_unit': 3.50, 'qtd' : 1 , 'is_available' : False},
 ]
 
+def product_not_in_db(product_id):
+    if product_id >= len(mock_database):
+        raise HTTPException(status_code=404, detail="Product not found")
+
 
 @app.get("/products/{product_id}", status_code=200, response_model = ProductBase, tags=["product"])
 async def read_item(product_id: int):
@@ -34,7 +38,7 @@ async def read_item(product_id: int):
     "is_available":false}
 
     """
-
+    product_not_in_db(product_id)
     product = mock_database[product_id]
     return product
 
@@ -78,6 +82,7 @@ async def overwrite_item(
     - **qtd**: quantidade do produto no inventário
     - **is_available**: verdadeiro caso o produto esteja disponível no inventário e falso caso contrário.
     """
+    product_not_in_db(product_id)
     mock_database[product_id] = product
     return {'product_id': product_id, 'product': product}
 
@@ -86,6 +91,7 @@ async def delete_item(product_id : int):
     """
     apaga um produto da base de dados.
     """
+    product_not_in_db(product_id)
     product = mock_database[product_id]
     mock_database.pop(product_id)
     return {'removed': product}
