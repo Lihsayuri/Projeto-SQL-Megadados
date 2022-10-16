@@ -1,3 +1,4 @@
+from itertools import product
 from typing import Union
 
 from fastapi import FastAPI, Body
@@ -57,3 +58,34 @@ async def create_item(product: ProductBase = Body(
     product = product.dict()
     mock_database.append(product)
     return product
+
+@app.put("/products/{product_id}", tags=["product"])
+async def overwrite_item(
+    product_id : int, 
+    product: ProductBase = Body(
+    example={
+        "name": "banana",
+        "price_unit": 1.50,
+        "qtd": 4,
+        "is_available": True,
+})):
+
+    """
+    Sobrescreva um produto com as seguintes informações abaixo:
+
+    - **name**: nome de cada produto
+    - **price_unit**: preço unitário do produto (em reais)
+    - **qtd**: quantidade do produto no inventário
+    - **is_available**: verdadeiro caso o produto esteja disponível no inventário e falso caso contrário.
+    """
+    mock_database[product_id] = product
+    return {'product_id': product_id, 'product': product}
+
+@app.delete("/products/{product_id}", tags=["product"])
+async def delete_item(product_id : int):
+    """
+    apaga um produto da base de dados.
+    """
+    product = mock_database[product_id]
+    mock_database.pop(product_id)
+    return {'removed': product}
