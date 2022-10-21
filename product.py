@@ -1,5 +1,6 @@
 # Importando bibliotecas importantes da FastAPI
 
+from email.policy import default
 from typing import Union
 from fastapi import FastAPI, Body, HTTPException, Path, Form
 from pydantic import BaseModel,Field
@@ -11,19 +12,20 @@ from fastapi.exception_handlers import (
 )
 from fastapi.responses import PlainTextResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.encoders import jsonable_encoder
 
 app = FastAPI()
 
 
-mock_database = [{'name' : "banana", 'price_unit': 1.50, 'qtd' : 4 , 'is_available' : True},
-                 {'name' : "pêra", 'price_unit': 1.23, 'qtd' : 7 , 'is_available' : True},
-                 {'name' : "manga", 'price_unit': 3.50, 'qtd' : 1 , 'is_available' : False},
+mock_database = [{'name' : "banana", 'qtd' : 4},
+                 {'name' : "pêra", 'qtd' : 7},
+                 {'name' : "manga", 'qtd' : 1},
 ]
 
 # --------------------------------------- Declarando a classe do produto -------------------------------------------------------
 class ProductBase(BaseModel):
-    name: str = Field(title="O nome do produto", max_length=300, example="Maçã")
-    qtd : int = Field(title = "A quantidade do produto", ge=0, description="A quantidade não pode ser negativa", example=4)
+    name: str = Field(default = "Placeholder", title="O nome do produto", max_length=300, example="Maçã")
+    qtd : int = Field(default = 0,  title = "A quantidade do produto", ge=0, description="A quantidade não pode ser negativa", example=4)
 
 # ----------------- Declarando função importante para mostrar erros em caso de dado não encontrado -----------------------------
 def product_not_in_db(product_id):
@@ -160,7 +162,7 @@ async def overwrite_item(
         })):
 
     """
-    Atualize as informações de um produto com as seguintes informações abaixo:
+    Atualize totalmente as informações de um produto com as seguintes informações abaixo:
 
     - **name**: nome de cada produto
     - **qtd**: quantidade do produto no inventário
@@ -168,6 +170,36 @@ async def overwrite_item(
     product_not_in_db(product_id)
     mock_database[product_id] = product
     return {'product_id': product_id, 'product': product}
+
+@app.patch("/products/{product_id}", response_model=ProductBase, tags=["product"])
+async def update_item(
+    product_id: int, 
+    product: ProductBase = Body(examples = {
+        "nome": {
+            "summary" : "Um exemplo modificando apenas o nome",
+            "value" :{
+                "name" : "maçã"
+            }
+        },
+        "quantidade" : {
+            "summary" : "Um exemplo modificando apenas a quantidade",
+            "value" : {
+                "qtd" : 0
+            }
+        }
+        })):
+    """
+    Atualize parcialmente as informações de um produto com as seguintes informações abaixo:
+
+    - **name**: nome de cada produto
+    - **qtd**: quantidade do produto no inventário
+    """
+    stored_product_data = mock_database[product_id]
+    stored_product_model = ProductBase(**stored_product_data)
+    update_data = product.dict(exclude_unset=True)
+    updated_product = stored_product_model.copy(update=update_data)
+    mock_database[product_id] = jsonable_encoder(updated_product)
+    return updated_product
 
 @app.delete("/products/{product_id}", tags=["product"])
 async def delete_item(product_id: int = Path(title="O id do produto que você quer deletar", ge=0)):
