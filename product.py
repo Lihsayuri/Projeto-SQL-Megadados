@@ -23,10 +23,7 @@ mock_database = [{'name' : "banana", 'price_unit': 1.50, 'qtd' : 4 , 'is_availab
 # --------------------------------------- Declarando a classe do produto -------------------------------------------------------
 class ProductBase(BaseModel):
     name: str = Field(title="O nome do produto", max_length=300, example="Maçã")
-    price_unit: float = Field(title = "O preço do produto", gt=0, description="O preço precisa ser maior que 0", example=2.56)
     qtd : int = Field(title = "A quantidade do produto", ge=0, description="A quantidade não pode ser negativa", example=4)
-    is_available: Union[bool, None] = Field(title = "Disponibilidade do produto", description = "Se o produto está disponível ou não", example=True)
-
 
 # ----------------- Declarando função importante para mostrar erros em caso de dado não encontrado -----------------------------
 def product_not_in_db(product_id):
@@ -50,52 +47,14 @@ async def validation_exception_handler(request, exc):
 @app.get("/", tags=["home page"])
 async def main():
     """
-    Apenas uma home page com forms para criar um produto
+    Apenas uma home page com gosto de macarrão
     """
     content = """
 <body>
-    <form action="/products_/" method="post">
-
-    <label for="name">Nome do produto:</label>
-    <input type="text" id="name" name="name"><br><br>
-
-    <label for="price_unit">Preço unitário:</label>
-    <input type="txt" id="price_unit" name="price_unit"><br><br>
-
-    <label for="qtd">Quantidade:</label>
-    <input type="number" id="qtd" name="qtd"><br><br>
-
-    <label for="is_available">Disponibilidade:</label>
-    <input type="text" id="is_available" name="is_available"><br><br>
-
-    <input type="submit">
+    <h1>Buon giorno mondo!</h1>
 </body>
     """
     return HTMLResponse(content=content)
-
-
-
-@app.post("/products_/", status_code=201, response_model=ProductBase, tags=["product"])
-async def create_item(*, name: str = Form(), price_unit : float = Form(), qtd : int = Form(), is_available : str = Form()):
-    """
-    Crie um produto com as seguintes informações abaixo na home page:
-
-    - **name**: nome de cada produto
-    - **price_unit**: preço unitário do produto (em reais)
-    - **qtd**: quantidade do produto no inventário
-    - **is_available**: verdadeiro caso o produto esteja disponível no inventário e falso caso contrário.
-    """
-    if is_available == 'True':
-        is_available = True
-    else:
-        is_available = False
-
-    produto = ProductBase(name = name, price_unit = price_unit, qtd = qtd, is_available = is_available)
-
-    product = produto.dict()
-    mock_database.append(product)
-    return product
-
 
 
 
@@ -124,12 +83,7 @@ async def read_item():
 
     {"name":"manga", 
 
-    "price_unit":3.5,
-
-    "qtd":1,
-    
-    "is_available":false}
-
+    "qtd":1}
     """
     return mock_database
 
@@ -142,19 +96,15 @@ async def create_item(*, product: ProductBase = Body(
                 "description": "Um exemplo normal de produto que funciona corretamente",
                 "value": {
                     "name": "banana",
-                    "price_unit": 1.50,
                     "qtd": 4,
-                    "is_available": True,
                 }
             },
             "convertido": {
                 "summary": "Um exemplo com conversão de dados",
-                "description": "A FastAPI converte string de preços para números automaticamente e vice-versa",
+                "description": "A FastAPI converte string de quantidade para números automaticamente e vice-versa",
                 "value": {
                     "name" : "banana",
-                    "price_unit" : "1.50",
-                    "qtd" : 4,
-                    "is_available" : True,
+                    "qtd" : "4"
                 }
             },
             "incorreto" : {
@@ -162,9 +112,7 @@ async def create_item(*, product: ProductBase = Body(
                 "description" : "Nessa situação, quando a tipagem é errada um erro é retornado",
                 "value":{
                     "name" : "banana",
-                    "price_unit" : "um real e cinquenta centavos",
-                    "qtd" : 4,
-                    "is_available" : True,
+                    "qtd" : "quatro"
                 }
             },
 
@@ -173,9 +121,7 @@ async def create_item(*, product: ProductBase = Body(
     Crie um produto com as seguintes informações abaixo:
 
     - **name**: nome de cada produto
-    - **price_unit**: preço unitário do produto (em reais)
     - **qtd**: quantidade do produto no inventário
-    - **is_available**: verdadeiro caso o produto esteja disponível no inventário e falso caso contrário.
     """
     product = product.dict()
     mock_database.append(product)
@@ -185,25 +131,21 @@ async def create_item(*, product: ProductBase = Body(
 async def overwrite_item(
     product_id: int = Path(title="O id do produto que você quer editar", ge=0), 
     product: ProductBase = Body(
-    examples = {
+        examples = {
             "normal": {
                 "summary": "Um exemplo normal de sucesso",
                 "description": "Um exemplo normal de produto que funciona corretamente",
                 "value": {
                     "name": "banana",
-                    "price_unit": 1.50,
                     "qtd": 4,
-                    "is_available": True,
                 }
             },
             "convertido": {
                 "summary": "Um exemplo com conversão de dados",
-                "description": "A FastAPI converte string de preços para números automaticamente e vice-versa",
+                "description": "A FastAPI converte string de quantidade para números automaticamente e vice-versa",
                 "value": {
                     "name" : "banana",
-                    "price_unit" : "1.50",
-                    "qtd" : 4,
-                    "is_available" : True,
+                    "qtd" : "4"
                 }
             },
             "incorreto" : {
@@ -211,20 +153,17 @@ async def overwrite_item(
                 "description" : "Nessa situação, quando a tipagem é errada um erro é retornado",
                 "value":{
                     "name" : "banana",
-                    "price_unit" : "um real e cinquenta centavos",
-                    "qtd" : 4,
-                    "is_available" : True,
+                    "qtd" : "quatro"
                 }
             },
-    })):
+
+        })):
 
     """
     Atualize as informações de um produto com as seguintes informações abaixo:
 
     - **name**: nome de cada produto
-    - **price_unit**: preço unitário do produto (em reais)
     - **qtd**: quantidade do produto no inventário
-    - **is_available**: verdadeiro caso o produto esteja disponível no inventário e falso caso contrário.
     """
     product_not_in_db(product_id)
     mock_database[product_id] = product
