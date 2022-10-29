@@ -1,3 +1,4 @@
+from itertools import product
 from sqlalchemy.orm import Session
 
 import models, schemas
@@ -11,9 +12,9 @@ def get_products(db: Session):
 
 
 # faça função para criar produto no banco de dados no mysql
-def create_product(db: Session, product: schemas.ProductBase):
+def create_product(db: Session, product: schemas.ProductCreate, user_id: int):
     # cria produto no banco de dados e retorna o produto criado
-    db_product = models.Product(**product.dict())
+    db_product = models.Product(**product.dict(), user_id=user_id)
     db.add(db_product)
     db.commit()
     db.refresh(db_product)
@@ -35,3 +36,24 @@ def create_product(db: Session, product: schemas.ProductBase):
 #     db.delete(db_product)
 #     db.commit()
 #     return db_product
+
+
+def get_user(db: Session, user_id: int):
+    return db.query(models.User).filter(models.User.id == user_id).first()
+
+
+def get_user_by_email(db: Session, email: str):
+    return db.query(models.User).filter(models.User.email == email).first()
+
+
+def get_users(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.User).all()
+
+
+def create_user(db: Session, user: schemas.UserCreate):
+    fake_hashed_password = user.password + "notreallyhashed"
+    db_user = models.User(email=user.email, first_name=user.first_name, last_name=user.last_name, hashed_password=fake_hashed_password)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
