@@ -10,7 +10,7 @@ class ProductCreate(ProductBase):
 
 class Product(ProductBase):
     id : int
-    owners_id : int
+    user_id : int
 
     class Config:
         orm_mode = True
