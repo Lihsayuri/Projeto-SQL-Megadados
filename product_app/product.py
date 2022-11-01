@@ -1,6 +1,7 @@
 # Importando bibliotecas importantes da FastAPI
 
 from email.policy import default
+from re import M
 from typing import Union
 from fastapi import FastAPI, Body, HTTPException, Path, Form, Response, Request, Depends
 from pydantic import BaseModel,Field
@@ -54,9 +55,9 @@ def product_not_in_db(db : Session, product_id: int):
     if crud.get_product(db, product_id) is None:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
 
-def user_not_in_db(db : Session, user_id: int):
-    if crud.get_user(db, user_id) is None:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+def mov_not_in_db(db : Session, id_mov: int):
+    if crud.get_movimentacao(db, id_mov) is None:
+        raise HTTPException(status_code=404, detail="Movimentação não encontrada")
 
 #  -----------------------------------  Handlers que enviam erros --------------------------------------------------------------
 @app.exception_handler(StarletteHTTPException)
@@ -89,18 +90,15 @@ async def main():
 
 
 
-@app.get("/products/{product_id}", status_code=200, response_model = schemas.Product, tags=["product"])
+@app.get("/products/{product_id}", status_code=200, response_model = schemas.Estoque, tags=["product"])
 async def read_item(Session = Depends(get_db), product_id: int = Path(title="O id do produto que você quer consultar", ge=0)):
     """
     Procura o produto baseado em seu id de identificação e retorna desse forma:
 
     {
-
-        "name": "banana",
-        "qtd": 4,
-        "id": 1,
-        "user_id": 1
-    
+        "id": 8,
+        "name": "manga",
+        "qtd": 0
     }
 
     """
@@ -110,28 +108,31 @@ async def read_item(Session = Depends(get_db), product_id: int = Path(title="O i
 
 
 
-@app.get("/products/", status_code=200, response_model = list[schemas.Product], tags=["product"])
+@app.get("/products/", status_code=200, response_model = list[schemas.Estoque], tags=["product"])
 async def read_item(Session = Depends(get_db)):
     """
     Lista todos os produtos e os retorna dessa forma:
 
     [
-
         {
-
+            "id": 5,
             "name": "banana",
-            "qtd": 4,
-            "id": 1,
-            "user_id": 1
-
+            "qtd": 0
         },
-
         {
+            "id": 6,
+            "name": "carambola",
+            "qtd": 0
+        },
+        {
+            "id": 8,
             "name": "manga",
-            "qtd": 4,
-            "id": 2,
-            "user_id": 1
-
+            "qtd": 0
+        },
+        {
+            "id": 7,
+            "name": "uva",
+            "qtd": 0
         }
     ]
     """
@@ -140,15 +141,14 @@ async def read_item(Session = Depends(get_db)):
     return products
 
 
-@app.post("/products/", status_code=201, response_model=schemas.Product, tags=["product"])
-async def create_product(user_id: int, Session = Depends(get_db) , product: schemas.ProductCreate = Body(
+@app.post("/products/", status_code=201, response_model=schemas.Estoque, tags=["product"])
+async def create_product(Session = Depends(get_db) , product: schemas.EstoqueCreate = Body(
         examples = {
             "normal": {
                 "summary": "Um exemplo normal de sucesso",
                 "description": "Um exemplo normal de produto que funciona corretamente",
                 "value": {
-                    "name": "banana",
-                    "qtd": 4,
+                    "name": "banana"
                 }
             },
             "convertido": {
@@ -156,7 +156,6 @@ async def create_product(user_id: int, Session = Depends(get_db) , product: sche
                 "description": "A FastAPI converte string de quantidade para números automaticamente e vice-versa",
                 "value": {
                     "name" : "banana",
-                    "qtd" : "4",
                 }
             },
             "incorreto" : {
@@ -164,7 +163,6 @@ async def create_product(user_id: int, Session = Depends(get_db) , product: sche
                 "description" : "Nessa situação, quando a tipagem é errada um erro é retornado",
                 "value":{
                     "name" : "banana",
-                    "qtd" : "quatro",
                 }
             },
 
@@ -176,190 +174,133 @@ async def create_product(user_id: int, Session = Depends(get_db) , product: sche
     - **name**: nome de cada produto
     - **qtd**: quantidade do produto no inventário
     """
-    db_product = crud.create_product(db=Session, product=product, user_id = user_id)
+    db_product = crud.create_product(db=Session, product=product)
     return db_product
 
 
+@app.delete("/products/{product_id}", status_code=200, response_model=schemas.Estoque, tags=["product"])
+async def delete_item(Session = Depends(get_db),product_id: int = Path(title="O id do produto que você quer deletar", ge=0)):
+    """
+    Apaga um produto da base de dados.
+
+    """
+    product_not_in_db(Session, product_id)
+    return crud.delete_product(db=Session, product_id=product_id)
+ 
 
 
-@app.put("/products/user{user_id}/{product_id}", tags=["product"])
+# Atualiza apenas o nome do produto
+@app.put("/products/{product_id}", tags=["product"])
 async def overwrite_item(
     Session = Depends(get_db),
     product_id: int = Path(title="O id do produto que você quer editar", ge=0), 
-    user_id: int = Path(title="O id do usuário que quer editar o produto", ge=0),
-    product: schemas.ProductCreate = Body(
+    product: schemas.EstoqueCreate = Body(
         examples = {
             "normal": {
                 "summary": "Um exemplo normal de sucesso",
                 "description": "Um exemplo normal de produto que funciona corretamente",
                 "value": {
                     "name": "banana",
-                    "qtd": 4,
                 }
             },
-            "convertido": {
-                "summary": "Um exemplo com conversão de dados",
-                "description": "A FastAPI converte string de quantidade para números automaticamente e vice-versa",
-                "value": {
-                    "name" : "banana",
-                    "qtd" : "4"
-                }
-            },
-            "incorreto" : {
-                "summary" : "Um exemplo de dado incorreto",
-                "description" : "Nessa situação, quando a tipagem é errada um erro é retornado",
-                "value":{
-                    "name" : "banana",
-                    "qtd" : "quatro"
-                }
-            },
-
         })):
 
     """
     Atualize totalmente as informações de um produto com as seguintes informações abaixo:
 
-    - **name**: nome de cada produto
-    - **qtd**: quantidade do produto no inventário
-    - **user_id**: id do usuário que criou o produto
-
-    Observação: O id do usuário não pode ser alterado, pois uma vez que o produto foi criado, ele pertence a um usuário específico.
+    - **product_id**: id do usuário que criou o produto
+    - **name**: nome do produto que você quer editar
 
     """
     product_not_in_db(Session , product_id)
-    db_product = crud.update_product(db=Session, product=product, product_id=product_id)
+    db_product = crud.update_product_nome(db=Session, product=product, product_id=product_id)
 
     return db_product
 
 
-@app.delete("/products/{product_id}", tags=["product"])
-async def delete_item(Session = Depends(get_db),product_id: int = Path(title="O id do produto que você quer deletar", ge=0)):
+
+#  # -------------------------------------- CRUD de usuários --------------------------------------------------------
+
+
+@app.get("/movimentacao/{id_mov}", status_code=200, response_model = schemas.Movimentacao, tags=["movimentacao"])
+async def read_item(Session = Depends(get_db), id_mov: int = Path(title="O id da movimentação que você quer consultar", ge=0)):
     """
-    Apaga um produto da base de dados.
+    Procura a movimentação baseado em seu id de identificação e retorna desse forma:
+
+        {
+        "id_mov": 1,
+        "qtd": 5,
+        "product_id": 5
+        }
     """
-    product_not_in_db(Session, product_id)
-    return crud.delete_product(db=Session, product_id=product_id)
- 
-
- # -------------------------------------- CRUD de usuários --------------------------------------------------------
+    mov_not_in_db(db = Session, id_mov = id_mov)
+    mov = crud.get_movimentacao(db = Session, movimentacao_id = id_mov)
+    return mov
 
 
-@app.get("/user/{user_id}", status_code=200, response_model = schemas.User, tags=["user"])
-async def read_item(Session = Depends(get_db), user_id: int = Path(title="O id do usuário que você quer consultar", ge=0)):
-    """
-    Procura o usuário baseado em seu id de identificação e retorna desse forma:
-
-    {
-
-        "email": "max_verstappen@hotmail.com",
-        "first_name": "max",
-        "last_name": "verstappen",
-        "id": 1,
-        "products": [
-            {
-            "name": "banana",
-            "qtd": 4,
-            "id": 1,
-            "user_id": 1
-            },
-            {
-            "name": "manga",
-            "qtd": 4,
-            "id": 2,
-            "user_id": 1
-            }
-    }
-
-    """
-    user_not_in_db(db = Session, user_id = user_id)
-    user = crud.get_user(db = Session, user_id = user_id)
-    return user
-
-
-
-@app.get("/users/", status_code=200, response_model = list[schemas.User], tags=["user"])
+@app.get("/movimentacao/", status_code=200, response_model = list[schemas.Movimentacao], tags=["movimentacao"])
 async def read_item(Session = Depends(get_db)):
     """
     Lista todos os usuários e os retorna dessa forma:
 
-[
-    {
+    [
 
-        "email": "max_verstappen@hotmail.com",
-        "first_name": "max",
-        "last_name": "verstappen",
-        "id": 1,
-        "products": [
         {
-            "name": "banana",
-            "qtd": 4,
-            "id": 1,
-            "user_id": 1
+            "id_mov": 1,
+            "qtd": 5,
+            "product_id": 5
         },
         {
-            "name": "manga",
-            "qtd": 4,
-            "id": 2,
-            "user_id": 1
+            "id_mov": 2,
+            "qtd": -2,
+            "product_id": 5
+        },
+        {
+            "id_mov": 3,
+            "qtd": 2,
+            "product_id": 6
         }
-        ]
-    },
-
-    {
-        "email": "lando_norris@hotmail.com",
-        "first_name": "lando",
-        "last_name": "norris",
-        "id": 2,
-        "products": []
-    },
-  ]
+        
+    ]
 
     """
 
-    users = crud.get_users(db=Session)
-    return users
+    movs = crud.get_movimentacao_all(db=Session)
+    return movs
 
 
-@app.post("/users/", status_code=201, response_model= schemas.User, tags=["user"])
-async def create_user(db : Session = Depends(get_db) , user: schemas.UserCreate = Body(
+@app.post("/products/{product_id}", status_code=201, response_model= schemas.Movimentacao, tags=["movimentacao"])
+async def create_movimentacao(db : Session = Depends(get_db) , 
+mov: schemas.MovimentacaoCreate = Body(
         examples = {
             "normal": {
                 "summary": "Um exemplo normal de sucesso",
                 "description": "Um exemplo normal de usuário que funciona corretamente",
                 "value": {
-                    "email": "max_verstappen@hotmail.com",
-                    "first_name": "max",
-                    "last_name": "verstappen",
-                    "password" : "simplylovely",
+                    "product_id": 5,
+                    "qtd": 5,
                 }
             }
         })):
     """
-    Crie um usuário com as seguintes informações abaixo:
+    Crie uma movimentação com as seguintes informações abaixo:
 
-    - **email**: email do usuário
-    - **first_name**: nome de cada usuário
-    - **last_name**: sobrenome de cada usuário
-    - **password**: senha de cada usuário
+    - **product_id**: id do produto que você quer movimentar
+    - **qtd**: quantidade do produto que você quer alterar
     """
 
-
-    db_user = crud.get_user_by_email(db, email=user.email)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email já está registrado")
-
-
-    return crud.create_user(db=db, user=user)
+    product_not_in_db(db, mov.product_id)
+    return crud.create_movimentacao(db=db, movimentacao=mov)
  
 
  
-@app.delete("/users/{user_id}", tags=["user"])
-async def delete_item(Session = Depends(get_db),user_id: int = Path(title="O id do usuário que você quer deletar", ge=0)):
-    """
-    Apaga um usuário da base de dados.
-    """
-    user_not_in_db(Session, user_id)
-    return crud.delete_user(db=Session, user_id=user_id)
+# @app.delete("/users/{user_id}", tags=["user"])
+# async def delete_item(Session = Depends(get_db),user_id: int = Path(title="O id do usuário que você quer deletar", ge=0)):
+#     """
+#     Apaga um usuário da base de dados.
+#     """
+#     user_not_in_db(Session, user_id)
+#     return crud.delete_user(db=Session, user_id=user_id)
  
 
 

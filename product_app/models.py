@@ -1,27 +1,33 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 
 from database import Base
 
-class User(Base):
-    __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(200), unique=True, index=True)
-    first_name = Column(String(100))
-    last_name = Column(String(100))
-    hashed_password = Column(String(50))
+class Movimentacao(Base):
+    __tablename__ = "movimentacao"
 
-    products = relationship("Product", back_populates="user")
+    id_mov = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    product_id = Column(Integer, ForeignKey("estoque.id"))
+    qtd = Column(Integer)
+
+    estoque = relationship("Estoque", back_populates="movimentacao", cascade="all, delete")
+    # estoque = relationship("Estoque", backref = backref("movimentacao", cascade = "all, delete")) 
 
 
-class Product(Base):
-    __tablename__ = "products"
+class Estoque(Base):
+    __tablename__ = "estoque"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(300), index=True)
-    qtd = Column(Integer, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    qtd = Column(Integer, primary_key = True, index=True, default=0)
 
-    user = relationship("User", back_populates="products")
+    movimentacao = relationship("Movimentacao", back_populates="estoque", cascade="all, delete")
+    # movimentacao = relationship("Movimentacao", backref = backref("estoque", cascade = "all, delete")) 
+
+
+
+
+
+
 
