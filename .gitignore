@@ -3,4 +3,5 @@ main.py
 __pycache__
 sql_app
 sql_app.db
+/env
 .env

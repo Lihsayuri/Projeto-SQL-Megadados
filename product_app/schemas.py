@@ -10,7 +10,6 @@ class EstoqueCreate(EstoqueBase):
     pass
 
 class Estoque(EstoqueBase):
-    id : int = Field(default=None, title="ID do produto")
     qtd : int = Field(default = 0,  title = "A quantidade do produto", description="A quantidade pode ser negativa (caso você esteja diminuindo do estoque)", example=4)
 
     class Config:
