@@ -9,8 +9,12 @@ class EstoqueBase(BaseModel):
 class EstoqueCreate(EstoqueBase):
     pass
 
+class EstoqueUpdate(EstoqueBase):
+    available: bool = Field(default = True, title = "Se o produto está disponível", description="Se o produto está disponível no estoque", example=True)
+
 class Estoque(EstoqueBase):
     qtd : int = Field(default = 0,  title = "A quantidade do produto", description="A quantidade pode ser negativa (caso você esteja diminuindo do estoque)", example=4)
+    available: bool = Field(default = True, title = "Se o produto está disponível", description="Se o produto está disponível no estoque", example=True)
 
     class Config:
         orm_mode = True

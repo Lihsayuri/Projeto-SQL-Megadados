@@ -21,6 +21,7 @@ class Estoque(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(300), index=True)
     qtd = Column(Integer, primary_key = True, index=True, default=0)
+    available = Column(Boolean, default=True)
 
     movimentacao = relationship("Movimentacao", back_populates="estoque", cascade="all, delete")
     # movimentacao = relationship("Movimentacao", backref = backref("estoque", cascade = "all, delete")) 

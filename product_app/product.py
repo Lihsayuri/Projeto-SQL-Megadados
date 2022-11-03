@@ -75,7 +75,9 @@ async def validation_exception_handler(request, exc):
 @app.get("/", tags=["home page"])
 async def main():
     """
-    Apenas uma home page com gosto de macarrão
+    Apenas uma home page com informações resumidas sobre modo de uso da API.
+    Para mais detalhes, confira a documentação no /docs.
+
     """
     content = """
 <body>
@@ -83,9 +85,9 @@ async def main():
     <p> Com a nossa API você poderá gerenciar um estoque. Para isso temos duas tabelas que você pode controlar: 
     a tabela de Estoque e a tabela de Movimentações</p>
     <ul> Na tabela de <b>Estoque</b> você poderá: 
-        <li>Criar produtos (apenas o nome e seu id (este último sendo opcional))</li>
+        <li>Criar produtos (apenas o nome, seu id (este sendo opcional) e disponibilidade (que por padrão na criação é True)</li>
         <li> Atualizar essas informações para o produto </li>
-        <li> Consultar os produtos sobre: seu id, nome e quantidade </li>
+        <li> Consultar os produtos sobre: seu id, nome, quantidade e disponibilidade </li>
         <li> E deletar o produto e todas suas movimentações do banco de dados [tome cuidado com isso] </li>
     </ul>
     <ul> Na tabela de <b>Movimentação</b> você poderá: 
@@ -116,9 +118,12 @@ async def read_item(Session = Depends(get_db), product_id: int = Path(title="O i
     Procura o produto baseado em seu id de identificação e retorna desse forma:
 
     {
+
         "id": 8,
         "name": "manga",
-        "qtd": 0
+        "qtd": 0,
+        "available": true
+
     }
 
     """
@@ -129,31 +134,37 @@ async def read_item(Session = Depends(get_db), product_id: int = Path(title="O i
 
 
 @app.get("/products/", status_code=200, response_model = list[schemas.Estoque], tags=["product"])
-async def read_item(Session = Depends(get_db)):
+async def read_items(Session = Depends(get_db)):
     """
     Lista todos os produtos e os retorna dessa forma:
 
     [
+
         {
             "id": 5,
             "name": "banana",
-            "qtd": 0
+            "qtd": 0,
+            "available": true
         },
         {
             "id": 6,
             "name": "carambola",
-            "qtd": 0
+            "qtd": 0,
+            "available": true
         },
         {
             "id": 8,
             "name": "manga",
-            "qtd": 0
+            "qtd": 0,
+            "available": false
         },
         {
             "id": 7,
             "name": "uva",
             "qtd": 0
+            "available": true
         }
+
     ]
     """
 
@@ -164,7 +175,7 @@ async def read_item(Session = Depends(get_db)):
 @app.post("/products/", status_code=201, response_model=schemas.Estoque, tags=["product"])
 async def create_product(Session = Depends(get_db) , product: schemas.EstoqueCreate = Body(
         examples = {
-            "normal": {
+            "normal sem id": {
                 "summary": "Um exemplo normal de sucesso (sem id)",
                 "description": "Um exemplo normal de produto que funciona corretamente (sem precisar colocar o id)",
                 "value": {
@@ -192,37 +203,32 @@ async def create_product(Session = Depends(get_db) , product: schemas.EstoqueCre
     """
     Crie um produto com as seguintes informações abaixo:
 
-    - **user_id**: id do usuário que criou o produto
-    - **name**: nome de cada produto
-    - **qtd**: quantidade do produto no inventário
+    - **id**: id do produto (que pode ser escolhido ou que será gerado automaticamente de maneira sequencial).
+    - **name**: nome de cada produto.
+    - **qtd**: quantidade do produto no inventário.
+    - **available**: disponibilidade do produto no inventário.
+
+    **Obs:** quando criado entende-se que o produto está disponível no inventário. Caso queira alterar essa informação, use o método PUT.
+    Assim, basta realizar um update no produto e alterar o valor de available para false.
+
+
     """
     db_product = crud.create_product(db=Session, product=product)
     return db_product
 
 
-@app.delete("/products/{product_id}", status_code=200, response_model=schemas.Estoque, tags=["product"])
-async def delete_item(Session = Depends(get_db),product_id: int = Path(title="O id do produto que você quer deletar", ge=0)):
-    """
-    Apaga um produto da base de dados.
-
-    """
-    product_not_in_db(Session, product_id)
-    return crud.delete_product(db=Session, product_id=product_id)
- 
-
-
-# Atualiza apenas o nome do produto
-@app.put("/products/{product_id}", tags=["product"])
+@app.put("/products/{product_id}", tags=["product"], status_code=200, response_model=schemas.Estoque)
 async def overwrite_item(
     Session = Depends(get_db),
     product_id: int = Path(title="O id do produto que você quer editar", ge=0), 
-    product: schemas.EstoqueCreate = Body(
+    product: schemas.EstoqueUpdate = Body(
         examples = {
             "normal sem id": {
                 "summary": "Um exemplo normal de sucesso",
                 "description": "Um exemplo normal de produto que funciona corretamente",
                 "value": {
                     "name": "banana",
+                    "available": False
                 }
             },
         })):
@@ -230,8 +236,17 @@ async def overwrite_item(
     """
     Atualize totalmente as informações de um produto com as seguintes informações abaixo:
 
-    - **product_id**: id do usuário que criou o produto
     - **name**: nome do produto que você quer editar
+    - **available**: se o produto está disponível ou não
+
+    **Importante:** a disponibilidade do produto é entendida como : a empresa possui um estoque e ainda trabalha
+    com determinado produto ou não. Porém, ainda que esse produto esteja indisponível, **é possível** fazer movimentações 
+    com ele, isso porque pode ser que a empresa deixou de comprar esse produto, mas ainda tenha no estoque. Assim, caso queira
+    zerar a quantidade no estoque de um produto, é possível fazer movimentações para alterar a quantidade do produto para 0. 
+
+    Ainda, um método **mais radical** é deletar o produto, mas isso **não é recomendado**, pois pode ser que a empresa
+    queira voltar a trabalhar com esse produto no futuro e queira saber as movimentações que foram feitas anteriormente
+    com ele.
 
     """
     product_not_in_db(Session , product_id)
@@ -240,12 +255,25 @@ async def overwrite_item(
     return db_product
 
 
+@app.delete("/products/{product_id}", status_code=200, response_model=schemas.Estoque, tags=["product"])
+async def delete_item(Session = Depends(get_db),product_id: int = Path(title="O id do produto que você quer deletar", ge=0)):
+    """
+    Apaga um produto da base de dados e todas as movimentações relacionadas a ele. 
+
+    **Atenção:** essa ação **não pode ser desfeita**, tome cuidado ao usar esse método.	
+
+    """
+    product_not_in_db(Session, product_id)
+    return crud.delete_product(db=Session, product_id=product_id)
+
+
+
 
 #  # -------------------------------------- CRUD DE MOVIMENTAÇÃO --------------------------------------------------------
 
 
 @app.get("/movimentacao/{id_mov}", status_code=200, response_model = schemas.Movimentacao, tags=["movimentacao"])
-async def read_item(Session = Depends(get_db), id_mov: int = Path(title="O id da movimentação que você quer consultar", ge=0)):
+async def read_movimentacao(Session = Depends(get_db), id_mov: int = Path(title="O id da movimentação que você quer consultar", ge=0)):
     """
     Procura a movimentação baseado em seu id de identificação e retorna desse forma:
 
@@ -261,7 +289,7 @@ async def read_item(Session = Depends(get_db), id_mov: int = Path(title="O id da
 
 
 @app.get("/movimentacao/", status_code=200, response_model = list[schemas.Movimentacao], tags=["movimentacao"])
-async def read_item(Session = Depends(get_db)):
+async def read_movimentacoes(Session = Depends(get_db)):
     """
     Lista todos os usuários e os retorna dessa forma:
 
@@ -295,7 +323,7 @@ async def read_item(Session = Depends(get_db)):
 async def create_movimentacao(db : Session = Depends(get_db) , 
 mov: schemas.MovimentacaoCreate = Body(
         examples = {
-            "normal": {
+            "normal sem id": {
                 "summary": "Um exemplo normal de sucesso (sem id)",
                 "description": "Um exemplo normal de movimentação que funciona corretamente (sem id)",
                 "value": {
@@ -303,7 +331,7 @@ mov: schemas.MovimentacaoCreate = Body(
                     "qtd": 5,
                 }
             },
-            "normal": {
+            "normal com id": {
                 "summary": "Um exemplo normal de sucesso",
                 "description": "Um exemplo normal de movimentação que funciona corretamente (com id)",
                 "value": {
@@ -311,13 +339,24 @@ mov: schemas.MovimentacaoCreate = Body(
                     "product_id": 5,
                     "qtd": 5,
                 }
+            },
+            "incorreto": {
+                "summary": "Um exemplo incorreto de movimentação",
+                "description": "Um exemplo com tipagem incorreta de movimentação que não funciona",
+                "value": {
+                    "id_mov" : "um",
+                    "product_id": "cinco",
+                    "qtd": "cinco",
+                }
             }
         })):
     """
     Crie uma movimentação com as seguintes informações abaixo:
 
+    - **id_mov**: id da movimentação que você quer criar (opcional)
     - **product_id**: id do produto que você quer movimentar
     - **qtd**: quantidade do produto que você quer alterar
+
     """
 
     product_not_in_db(db, mov.product_id)
@@ -328,7 +367,9 @@ mov: schemas.MovimentacaoCreate = Body(
 @app.delete("/movimentacao/{mov_id}", status_code=200, response_model= schemas.Movimentacao, tags=["movimentacao"])
 async def delete_movimentacao(Session = Depends(get_db), mov_id: int = Path(title="O id da movimentação que você quer deletar", ge=0)):
     """
-    Apaga um usuário da base de dados.
+    Apaga uma movimentação da base de dados e automaticamente atualiza o estoque.
+
+    **Atenção:** essa ação **não pode ser desfeita**, tome cuidado ao usar esse método.	
 
     """
     mov_not_in_db(Session, mov_id)
@@ -343,10 +384,18 @@ async def overwrite_movimentacao(
         examples = {
             "normal": {
                 "summary": "Um exemplo normal de sucesso",
-                "description": "Um exemplo normal de usuário que funciona corretamente",
+                "description": "Um exemplo normal de atualização que funciona corretamente",
                 "value": {
                     "product_id": 5,
                     "qtd": 5,
+                }
+            },
+            "incorreto": {
+                "summary": "Um exemplo incorreto de atualização",
+                "description": "Um exemplo incorreto de atualização que não funciona",
+                "value": {
+                    "product_id": "cinco",
+                    "qtd": "cinco",
                 }
             }
         })):
@@ -356,10 +405,11 @@ async def overwrite_movimentacao(
 
     - **id_mov**: id da movimentação
     - **qtd**: quantidade nova da movimentação
-    - **product_id**: o id do produto que você quer alterar na movimentação,
+    - **product_id**: o id do produto que você quer alterar na movimentação
 
     """
     mov_not_in_db(Session , mov_id)
+    product_not_in_db(Session, mov.product_id)
     db_mov = crud.update_movimentacao(db=Session, movimentacao_id= mov_id, movimentacao= mov)
 
     return db_mov

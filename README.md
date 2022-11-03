@@ -17,9 +17,9 @@
 - CRUD implementada.
 - Para o banco de dados foi utilizado o banco de dados mysql.
     - No banco de dados temos duas tabelas: a de Estoque e a de Movimentação.
-    - Cada produto do estoque tem: um id, nome, uma quantidade.
+    - Cada produto do estoque tem: um id, nome, uma quantidade e a disponibilidade.
     - Cada movimentação na tabela de movimentação tem: um id, o id do produto sendo alterado, e a quantidade.
-- Observação: ao criar o produto no estoque a quantidade será 0 por default e apenas será alterada com as movimentações daquele produto. Do mesmo modo, ao tentar editar o produto diretamente na tabela de Estoque, o usuário apenas poderá alterar o nome. E ao deletar o produto do Estoque, ele também deleta as movimentações relacionadas a esse produto.  
+- Observação: ao criar o produto no estoque a quantidade será 0 por default e apenas será alterada com as movimentações daquele produto. Do mesmo modo, ao tentar editar o produto diretamente na tabela de Estoque, o usuário apenas poderá alterar o nome e a disponibilidade. E ao deletar (de fato) o produto do Estoque, ele também deleta as movimentações relacionadas a esse produto, caso isso não seja desejado, é possível mudar a disponibilidade do produto de true para false. 
 
 
 ## Modo de uso:

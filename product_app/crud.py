@@ -36,10 +36,11 @@ def delete_product(db: Session, product_id: int):
     # Retorne o produto deletado
     return db_product
 
-def update_product_nome(db: Session, product: schemas.EstoqueCreate, product_id: int):
+def update_product_nome(db: Session, product: schemas.EstoqueUpdate, product_id: int):
     db_product = db.query(models.Estoque).filter(models.Estoque.id == product_id).first()
     try:
         db_product.name = product.name
+        db_product.available = product.available
         db.commit()
     except:
         db.rollback()
