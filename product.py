@@ -17,21 +17,24 @@ from fastapi.encoders import jsonable_encoder
 app = FastAPI()
 
 
-mock_database = [{'name' : "banana", 'qtd' : 4},
-                 {'name' : "pêra", 'qtd' : 7},
-                 {'name' : "manga", 'qtd' : 1},
-]
+mock_database = [{'id' : 1, 'name' : "banana", 'qtd' : 4},
+                 {'id': 2, 'name' : "pêra", 'qtd' : 7},
+                 {'id': 3, 'name' : "manga", 'qtd' : 1}]
 
 # --------------------------------------- Declarando a classe do produto -------------------------------------------------------
-class ProductBase(BaseModel):
+class ProductUpdate(BaseModel):
     name: str = Field(default = "Placeholder", title="O nome do produto", max_length=300, example="Maçã")
     qtd : int = Field(default = 0,  title = "A quantidade do produto", ge=0, description="A quantidade não pode ser negativa", example=4)
 
+class ProductBase(ProductUpdate):
+    id : int = Field(title = "Id do produto", description = "Identificador do produto", ge = 1)
+    # name: str = Field(default = "Placeholder", title="O nome do produto", max_length=300, example="Maçã")
+    # qtd : int = Field(default = 0,  title = "A quantidade do produto", ge=0, description="A quantidade não pode ser negativa", example=4)
+
 # ----------------- Declarando função importante para mostrar erros em caso de dado não encontrado -----------------------------
 def product_not_in_db(product_id):
-    if product_id >= len(mock_database):
+    if product_id not in [product['id'] for product in mock_database]:
         raise HTTPException(status_code=404, detail="Produto não encontrado!")
-
 
 #  -----------------------------------  Handlers que enviam erros --------------------------------------------------------------
 @app.exception_handler(StarletteHTTPException)
@@ -75,8 +78,11 @@ async def read_item(product_id: int = Path(title="O id do produto que você quer
 
     """
     product_not_in_db(product_id)
-    product = mock_database[product_id]
-    return product
+    for product in mock_database:
+        if product['id'] == product_id:
+            produto = product
+
+    return produto
 
 @app.get("/products/", status_code=200, response_model = list[ProductBase], tags=["product"])
 async def read_item():
@@ -97,6 +103,7 @@ async def create_item(*, product: ProductBase = Body(
                 "summary": "Um exemplo normal de sucesso",
                 "description": "Um exemplo normal de produto que funciona corretamente",
                 "value": {
+                    "id": 1,
                     "name": "banana",
                     "qtd": 4,
                 }
@@ -105,6 +112,7 @@ async def create_item(*, product: ProductBase = Body(
                 "summary": "Um exemplo com conversão de dados",
                 "description": "A FastAPI converte string de quantidade para números automaticamente e vice-versa",
                 "value": {
+                    "id": "1",
                     "name" : "banana",
                     "qtd" : "4"
                 }
@@ -113,6 +121,7 @@ async def create_item(*, product: ProductBase = Body(
                 "summary" : "Um exemplo de dado incorreto",
                 "description" : "Nessa situação, quando a tipagem é errada um erro é retornado",
                 "value":{
+                    "id" : "um",
                     "name" : "banana",
                     "qtd" : "quatro"
                 }
@@ -122,6 +131,7 @@ async def create_item(*, product: ProductBase = Body(
     """
     Crie um produto com as seguintes informações abaixo:
 
+    - **id**: id de cada produto
     - **name**: nome de cada produto
     - **qtd**: quantidade do produto no inventário
     """
@@ -132,7 +142,7 @@ async def create_item(*, product: ProductBase = Body(
 @app.put("/products/{product_id}", tags=["product"])
 async def overwrite_item(
     product_id: int = Path(title="O id do produto que você quer editar", ge=0), 
-    product: ProductBase = Body(
+    product: ProductUpdate = Body(
         examples = {
             "normal": {
                 "summary": "Um exemplo normal de sucesso",
@@ -164,17 +174,23 @@ async def overwrite_item(
     """
     Atualize totalmente as informações de um produto com as seguintes informações abaixo:
 
+    - **id**: id de cada produto (mas você não pode atualizá-lo. O id a ser considerado é o que
+    escreve no campo product_id separadamente)
     - **name**: nome de cada produto
     - **qtd**: quantidade do produto no inventário
     """
     product_not_in_db(product_id)
-    mock_database[product_id] = product
+    for produto in mock_database:
+        if produto['id'] == product_id:
+            produto['name'] = product.name
+            produto['qtd'] = product.qtd        
+            
     return {'product_id': product_id, 'product': product}
 
 @app.patch("/products/{product_id}", response_model=ProductBase, tags=["product"])
 async def update_item(
     product_id: int, 
-    product: ProductBase = Body(examples = {
+    product: ProductUpdate = Body(examples = {
         "nome": {
             "summary" : "Um exemplo modificando apenas o nome",
             "value" :{
@@ -190,23 +206,39 @@ async def update_item(
         })):
     """
     Atualize parcialmente as informações de um produto com as seguintes informações abaixo:
-
+    
+    - **id**: id de cada produto
     - **name**: nome de cada produto
     - **qtd**: quantidade do produto no inventário
     """
-    stored_product_data = mock_database[product_id]
-    stored_product_model = ProductBase(**stored_product_data)
+
+
+    for produto in mock_database:
+        if produto['id'] == product_id:
+            produto_escolhido = produto
+
+    stored_product_data = produto_escolhido
+    stored_product_model = ProductUpdate(**stored_product_data)
     update_data = product.dict(exclude_unset=True)
+    update_data['id'] = product_id
     updated_product = stored_product_model.copy(update=update_data)
-    mock_database[product_id] = jsonable_encoder(updated_product)
-    return updated_product
+    temp_product =  ProductBase(id=product_id, name= updated_product.name, qtd = updated_product.qtd)
+
+    for i in range(len(mock_database)):
+        if mock_database[i]['id'] == product_id:
+            mock_database[i] = temp_product.dict()
+
+    return temp_product
 
 @app.delete("/products/{product_id}", tags=["product"])
 async def delete_item(product_id: int = Path(title="O id do produto que você quer deletar", ge=0)):
     """
-    apaga um produto da base de dados.
+    Apaga um produto da base de dados.
     """
     product_not_in_db(product_id)
-    product = mock_database[product_id]
-    mock_database.pop(product_id)
-    return {'removed': product}
+
+    for produto in mock_database:
+        if produto['id'] == product_id:
+            mock_database.remove(produto)
+
+    return {'Produto removido com sucesso. Antigo id': product_id}
